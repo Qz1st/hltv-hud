@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Пульт — HLTV Score Widget</title>
+<style>
+  :root{--bg:#0f1117;--panel:#171a22;--line:#262b36;--text:#e9ecf2;--muted:#8d95a5;--accent:#ff4655;--ok:#3ecf8e;--warn:#f2b13b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Segoe UI",Inter,system-ui,sans-serif}
+  main{max-width:860px;margin:0 auto;padding:20px 14px 40px}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 16px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 10px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input[type=text],input[type=number],select{background:#0d0f14;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;font:inherit;min-width:0}
+  input[type=number]{width:64px;text-align:center}
+  .grow{flex:1 1 260px}
+  button{background:#232836;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 13px;font:inherit;cursor:pointer}
+  button:hover{border-color:#3a4252}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.small{padding:5px 10px;font-size:13px}
+  .status{display:flex;gap:6px 16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:10px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--muted)}
+  .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--accent)}
+  .error{color:#ffb4b4;margin-top:8px;font-size:13px}
+  .preview{background:repeating-conic-gradient(#1b1e26 0 25%,#14171e 0 50%) 0 0/20px 20px;border-radius:10px;border:1px solid var(--line);height:80px;overflow:hidden;padding:6px}
+  .preview iframe{width:100%;height:100%;border:0;background:transparent}
+  .copy{display:flex;gap:8px;align-items:center}
+  code{background:#0d0f14;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;flex:1;overflow:auto;white-space:nowrap}
+  code.in{display:inline;padding:1px 5px;flex:none}
+  .manual-grid{display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;align-items:center}
+  .lbl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  .stepper{display:flex;gap:4px;align-items:center}
+  .stepper button{padding:5px 10px}
+  label.chk{display:flex;gap:8px;align-items:center;cursor:pointer}
+  .maps-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .maps-list span{background:#0d0f14;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--muted)}
+  .maps-list span.done{color:var(--text)}
+  .hint{color:var(--muted);font-size:13px;margin-top:8px}
+  details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:8px}
+  @media (max-width:560px){.manual-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>HLTV Score Widget</h1>
+  <p class="sub" id="subtitle">Счёт параллельного матча для OBS. Вставьте ссылку на матч с HLTV — плашка обновится сама.</p>
+
+  <section>
+    <h2>Матч с HLTV</h2>
+    <div class="row">
+      <input type="text" id="url" class="grow" placeholder="https://www.hltv.org/matches/2399724/legacy-vs-nemiga-...">
+      <button class="primary" id="setMatch">Показать</button>
+      <button id="refresh" title="Обновить сейчас">↻</button>
+      <button id="clear">Скрыть</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="maps-list" id="mapsList"></div>
+    <div class="error" id="error"></div>
+  </section>
+
+  <section>
+    <h2>Превью</h2>
+    <div class="preview"><iframe id="preview" src="/widget"></iframe></div>
+  </section>
+
+  <section>
+    <h2>Добавить в OBS</h2>
+    <div class="copy"><code id="widgetUrl"></code><button class="small" id="copyW">Копировать</button></div>
+    <div class="hint">Источники → «+» → <b>Браузер</b> → вставить адрес. Ширина <b>490</b>, высота <b>62</b>. Поставьте над вебкой.<br>
+      В конце адреса можно дописать: <code class="in">?scale=1.3</code> — размер, <code class="in">?align=right</code> — прижать вправо, <code class="in">?nologo=1</code> — без логотипов.</div>
+    <div class="copy" style="margin-top:12px"><code id="panelUrl"></code><button class="small" id="copyP">Копировать</button></div>
+    <div class="hint">Этот пульт можно встроить в OBS: меню <b>Док-панели → Пользовательские док-панели браузера</b> → имя «Счёт», URL — адрес выше.</div>
+  </section>
+
+  <section>
+    <h2>Отображение</h2>
+    <div class="row" style="gap:18px">
+      <label class="chk"><input type="checkbox" id="showLogos"> Логотипы команд</label>
+      <label class="chk"><input type="checkbox" id="showMap"> Название карты</label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ручной режим</h2>
+    <label class="chk"><input type="checkbox" id="manualOn"> Вести счёт вручную (если HLTV не отвечает)</label>
+    <div style="margin-top:12px">
+      <div class="manual-grid">
+        <span class="lbl">Команда</span><span class="lbl">Карты</span><span class="lbl">Раунды</span>
+        <input type="text" id="mt1">
+        <div class="stepper"><button data-k="maps1" data-d="-1">−</button><input type="number" id="mmaps1" min="0"><button data-k="maps1" data-d="1">+</button></div>
+        <div class="stepper"><button data-k="rounds1" data-d="-1">−</button><input type="number" id="mrounds1" min="0"><button data-k="rounds1" data-d="1">+</button></div>
+        <input type="text" id="mt2">
+        <div class="stepper"><button data-k="maps2" data-d="-1">−</button><input type="number" id="mmaps2" min="0"><button data-k="maps2" data-d="1">+</button></div>
+        <div class="stepper"><button data-k="rounds2" data-d="-1">−</button><input type="number" id="mrounds2" min="0"><button data-k="rounds2" data-d="1">+</button></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="mmap" placeholder="Карта (Mirage)" style="width:150px">
+        <span style="color:var(--muted)">BO</span><input type="number" id="mbo" min="1" max="5">
+        <button class="small" id="resetRounds">Раунды → 0:0</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="progBox">
+    <h2>Программа</h2>
+    <div class="row" style="justify-content:space-between">
+      <label class="chk" id="autostartRow"><input type="checkbox" id="autostart"> Запускать вместе с Windows (тихо, без окон)</label>
+      <button id="shutdown">Выключить программу</button>
+    </div>
+    <details id="srcBox">
+      <summary>Дополнительно: откуда брать данные</summary>
+      <div class="row" style="margin-top:8px">
+        <select id="source">
+          <option value="auto">Автоматически (рекомендуется)</option>
+          <option value="direct">Только напрямую</option>
+          <option value="browser">Только через браузер</option>
+        </select>
+      </div>
+      <div class="hint">«Автоматически»: сначала прямой запрос к HLTV; если Cloudflare блокирует — страница матча открывается в невидимом браузере. <span id="browserInfo"></span></div>
+    </details>
+    <div class="hint" id="verInfo"></div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// какой худ: /p/<id>/<ключ> на сервере, иначе локальный
+const pm = location.pathname.match(/^\/p\/([a-z0-9]+)\/([A-Za-z0-9_-]+)/);
+const HUD = pm ? pm[1] : 'local', KEY = pm ? pm[2] : '', CLOUD = !!pm;
+const API = '/api/h/' + HUD + '/';
+const post = (a, b) => fetch(API + a, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Key': KEY }, body: JSON.stringify(b || {}) }).then(r => r.json());
+const getj = (a) => fetch(API + a + (KEY ? '?k=' + encodeURIComponent(KEY) : ''), { cache: 'no-store', headers: { 'X-Key': KEY } }).then(r => r.json());
+const widgetUrl = location.origin + (CLOUD ? '/w/' + HUD : '/widget');
+const panelUrl = CLOUD ? location.origin + '/p/' + HUD + '/' + KEY : location.origin + '/';
+$('widgetUrl').textContent = widgetUrl; $('panelUrl').textContent = panelUrl;
+$('preview').src = CLOUD ? '/w/' + HUD : '/widget';
+function copy(btn, text) {
+  const done = () => { btn.textContent = 'Скопировано'; setTimeout(() => btn.textContent = 'Копировать', 1500); };
+  const fb = () => { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch {} t.remove(); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fb); else fb();
+}
+$('copyW').onclick = () => copy($('copyW'), widgetUrl);
+$('copyP').onclick = () => copy($('copyP'), panelUrl);
+const SNAP_KEY = 'hud-snap:' + HUD;
+if (CLOUD) { try { const L = JSON.parse(localStorage.getItem('hlth-huds') || '[]'); if (!L.some(h => h.id === HUD)) { L.push({ id: HUD, key: KEY, created: Date.now() }); localStorage.setItem('hlth-huds', JSON.stringify(L)); } } catch {} }
+const saveSnap = (s) => { try { if (s && s.snap) localStorage.setItem(SNAP_KEY, JSON.stringify(s.snap)); } catch {} };
+const loadSnap = () => { try { return JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch { return null; } };
+
+fetch('/api/app').then(r => r.json()).then(a => {
+  if (a.cloud) {
+    $('autostartRow').style.display = 'none';
+    $('shutdown').textContent = 'Удалить этот худ';
+    $('shutdown').onclick = async () => {
+      if (!confirm('Удалить худ? Плашка в OBS перестанет работать, ссылки станут недействительны.')) return;
+      await post('delete'); try { localStorage.removeItem(SNAP_KEY); } catch {} location.href = '/';
+    };
+    $('subtitle').innerHTML = 'Худ <b>' + esc(HUD) + '</b>. Сохраните ссылку на эту страницу — это ваш пульт. <a href="/" style="color:#9ab">Все худы →</a>';
+  } else {
+    $('autostart').checked = a.autostart;
+    if (!a.canAutostart) $('autostartRow').style.visibility = 'hidden';
+    $('shutdown').onclick = async () => {
+      if (!confirm('Выключить программу? Плашка пропадёт из OBS, пока снова не запустите HLTV-Score-Widget.exe.')) return;
+      await fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
+    };
+  }
+  if (a.demo) $('subtitle').textContent = 'ДЕМО-РЕЖИМ: выдуманный матч, HLTV не используется. Ссылку можно вставить любую.';
+  $('browserInfo').textContent = a.browserFound ? 'Браузер найден.' : (a.cloud ? 'На этом сервере браузера нет — только прямые запросы.' : 'Edge/Chrome на этом компьютере не найден.');
+  $('verInfo').textContent = 'Версия ' + a.version + (a.cloud ? '' : ' · порт ' + a.port);
+}).catch(() => {});
+$('autostart').onchange = () => fetch('/api/autostart', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: $('autostart').checked }) });
+$('source').onchange = () => post('source', { source: $('source').value });
+
+async function loadConfig() {
+  let cfg = await getj('config').catch(() => null);
+  if (!cfg || cfg.missing || !cfg.display) {
+    await fetch(API + 'restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snap: loadSnap() || {} }) }).catch(() => {});
+    cfg = await getj('config').catch(() => null);
+  }
+  if (!cfg || !cfg.display) { if (cfg && cfg.error) $('error').textContent = cfg.error; return; }
+  if (cfg.matchId && !$('url').value) $('url').value = 'https://www.hltv.org/matches/' + cfg.matchId;
+  $('showLogos').checked = cfg.display.showLogos !== false;
+  $('showMap').checked = cfg.display.showMap !== false;
+  $('manualOn').checked = !!cfg.manual;
+  $('source').value = cfg.source || 'auto';
+  const m = cfg.manualData;
+  $('mt1').value = m.team1; $('mt2').value = m.team2;
+  $('mmaps1').value = m.maps1; $('mmaps2').value = m.maps2;
+  $('mrounds1').value = m.rounds1; $('mrounds2').value = m.rounds2;
+  $('mmap').value = m.map || ''; $('mbo').value = m.bestOf || 3;
+}
+
+$('setMatch').onclick = async () => {
+  $('error').textContent = '';
+  const r = await post('match', { url: $('url').value });
+  if (r.error) $('error').textContent = r.error;
+  $('manualOn').checked = false;
+};
+$('url').addEventListener('keydown', e => { if (e.key === 'Enter') $('setMatch').click(); });
+$('refresh').onclick = () => post('refresh');
+$('clear').onclick = async () => { await post('manual', { enabled: false }); await post('match', { url: '' }); $('manualOn').checked = false; };
+['showLogos', 'showMap'].forEach(k => $(k).onchange = () => post('display', { [k]: $(k).checked }));
+
+function manualData() {
+  return {
+    team1: $('mt1').value, team2: $('mt2').value,
+    maps1: +$('mmaps1').value || 0, maps2: +$('mmaps2').value || 0,
+    rounds1: $('mrounds1').value === '' ? '' : +$('mrounds1').value,
+    rounds2: $('mrounds2').value === '' ? '' : +$('mrounds2').value,
+    map: $('mmap').value, bestOf: +$('mbo').value || 3
+  };
+}
+const pushManual = () => post('manual', { data: manualData() });
+['mt1', 'mt2', 'mmaps1', 'mmaps2', 'mrounds1', 'mrounds2', 'mmap', 'mbo'].forEach(id => $(id).oninput = pushManual);
+document.querySelectorAll('.stepper button').forEach(b => b.onclick = () => {
+  const el = $('m' + b.dataset.k); el.value = Math.max(0, (+el.value || 0) + (+b.dataset.d)); pushManual();
+});
+$('resetRounds').onclick = () => { $('mrounds1').value = 0; $('mrounds2').value = 0; pushManual(); };
+
+let lastState = null;
+$('manualOn').onchange = () => {
+  const on = $('manualOn').checked;
+  if (on && lastState && lastState.mode === 'hltv' && lastState.team1) {
+    $('mt1').value = lastState.team1; $('mt2').value = lastState.team2;
+    $('mmaps1').value = lastState.maps1; $('mmaps2').value = lastState.maps2;
+    $('mrounds1').value = lastState.rounds1 ?? 0; $('mrounds2').value = lastState.rounds2 ?? 0;
+    $('mmap').value = lastState.map || ''; $('mbo').value = lastState.bestOf || 3;
+  }
+  post('manual', { enabled: on, data: manualData() });
+};
+
+const SRC = { direct: 'HLTV напрямую', browser: 'HLTV через невидимый браузер', 'browser-window': 'HLTV через браузер (скрытое окно)', demo: 'демо', manual: 'вручную' };
+async function poll() {
+  try {
+    const s = await getj('state');
+    if (s.missing) { await loadConfig(); return; }
+    lastState = s; saveSnap(s);
+    const st = $('status');
+    if (s.mode === 'manual') st.innerHTML = '<span><span class="dot warn"></span>Ручной режим — счёт ведёте вы</span>';
+    else if (!s.matchId) st.innerHTML = '<span><span class="dot"></span>Матч не выбран — плашка скрыта</span>';
+    else {
+      const statusTxt = { loading: 'загрузка…', live: 'идёт', scheduled: 'ещё не начался', over: 'завершён', error: 'ошибка' }[s.status] || s.status;
+      const sbTxt = { on: 'раунды вживую', connecting: 'подключаюсь к скорботу…', off: 'раунды раз в 30 сек' }[s.scorebot];
+      const ago = s.updatedAt ? Math.max(0, Math.round((Date.now() - s.updatedAt) / 1000)) + ' с назад' : '—';
+      st.innerHTML =
+        `<span><span class="dot ${s.status === 'error' ? 'bad' : s.status === 'live' ? 'ok' : 'warn'}"></span>${esc(s.team1 || '?')} vs ${esc(s.team2 || '?')} — ${statusTxt}</span>` +
+        (s.status === 'live' ? `<span><span class="dot ${s.scorebot === 'on' ? 'ok' : 'warn'}"></span>${sbTxt}</span>` : '') +
+        (s.source ? `<span>источник: ${SRC[s.source] || esc(s.source)}</span>` : '') +
+        `<span>обновлено ${ago}</span>`;
+    }
+    $('error').textContent = s.error || '';
+    $('mapsList').innerHTML = (s.mapsList || []).map(m => `<span class="${m.done ? 'done' : ''}">${esc(m.name || '?')}${m.score ? ' ' + (+m.score[0]) + ':' + (+m.score[1]) : ''}</span>`).join('');
+  } catch { $('status').innerHTML = CLOUD ? '<span><span class="dot bad"></span>Сервер не отвечает (возможно, просыпается — подождите минуту)</span>' : '<span><span class="dot bad"></span>Программа не запущена — запустите HLTV-Score-Widget.exe</span>'; }
+}
+loadConfig().then(poll);
+setInterval(poll, 1500);
+</script>
+</body>
+</html>

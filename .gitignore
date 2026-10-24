@@ -1,0 +1,12 @@
+node_modules/
+win/
+dist/
+data/
+assets.js
+config.json
+rooms.json
+secret.txt
+browser-profile/
+*.log
+*.exe
+package-lock.json

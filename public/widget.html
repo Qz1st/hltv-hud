@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>HLTV Score Widget</title>
+<style>
+  /*
+    Параметры адреса (необязательно):
+      ?scale=1.2      — масштаб
+      ?align=right    — прижать к правому краю источника (left | center | right)
+      ?nologo=1       — без логотипов
+      ?debug=1        — показывать ошибки
+  */
+  @font-face{font-family:Bahn;src:local("Bahnschrift SemiBold"),local("Bahnschrift"),local("DIN Alternate"),local("Barlow SemiBold");}
+  :root{
+    --ct:#4aa8ff; --t:#ffb02e; --neutral:#ffffff;
+    --bg:#0b0f1a; --text:#ffffff; --muted:rgba(255,255,255,.62);
+    --tint1:rgba(255,255,255,.10); --tint2:rgba(255,255,255,.10);
+  }
+  html,body{margin:0;padding:0;background:transparent;overflow:hidden}
+  body{font-family:Bahnschrift,"Bahn","DIN Alternate","Segoe UI",Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased}
+  .wrap{display:flex;justify-content:var(--align,flex-start);padding:4px}
+  .bar{
+    position:relative;display:grid;align-items:center;
+    grid-template-columns:auto minmax(0,1fr) 46px 76px 46px minmax(0,1fr) auto;
+    width:480px;height:52px;padding:0 10px;box-sizing:border-box;column-gap:6px;
+    background:
+      linear-gradient(90deg,var(--tint1) 0%,rgba(0,0,0,0) 34%,rgba(0,0,0,0) 66%,var(--tint2) 100%),
+      var(--bg);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:8px;
+    box-shadow:0 4px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    transform-origin:top left;transition:opacity .35s, transform .35s;
+    overflow:hidden;
+  }
+  .bar.hidden{opacity:0}
+  .logo{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  .logo.off{visibility:hidden;width:0;margin:0}
+  .bar.nologos .logo{display:block;width:0;visibility:hidden}
+  .team{display:flex;flex-direction:column;justify-content:center;min-width:0;gap:3px}
+  .team.r{align-items:flex-end;text-align:right}
+  .name{font-weight:700;font-size:14.5px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1}
+  .dots{display:flex;gap:3px;height:8px}
+  .dot{width:6px;height:6px;border-radius:50%;border:1.5px solid rgba(255,255,255,.7);box-sizing:content-box}
+  .dot.won{background:#fff;border-color:#fff;box-shadow:0 0 4px rgba(255,255,255,.6)}
+  .score{font-weight:700;font-size:36px;line-height:1;text-align:center;font-variant-numeric:tabular-nums;color:var(--neutral);text-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .score.CT{color:var(--ct)} .score.T{color:var(--t)}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;gap:3px}
+  .center .top{font-weight:700;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+  .center .bot{font-size:10px;color:var(--muted);letter-spacing:.04em;white-space:nowrap}
+  .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ff3b4a;margin-right:4px;vertical-align:1px;animation:p 1.4s infinite}
+  @keyframes p{50%{opacity:.25}}
+  .bump{animation:bump .8s ease}
+  @keyframes bump{0%{transform:scale(1.3);filter:brightness(1.8)}100%{transform:scale(1);filter:none}}
+  .loser{opacity:.5}
+  .err{position:absolute;left:0;right:0;bottom:0;font:10px Arial;color:#ffb4b4;background:rgba(0,0,0,.7);padding:1px 6px;display:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar hidden" id="bar">
+    <img class="logo off" id="l1" alt="">
+    <div class="team"><div class="name" id="n1">—</div><div class="dots" id="d1"></div></div>
+    <div class="score" id="s1">0</div>
+    <div class="center"><div class="top" id="ct">—</div><div class="bot" id="cb"></div></div>
+    <div class="score" id="s2">0</div>
+    <div class="team r"><div class="name" id="n2">—</div><div class="dots" id="d2"></div></div>
+    <img class="logo off" id="l2" alt="">
+    <div class="err" id="err"></div>
+  </div>
+</div>
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const bar = document.getElementById('bar');
+  const scale = parseFloat(q.get('scale')) || 1;
+  const align = { left: 'flex-start', center: 'center', right: 'flex-end' }[q.get('align')] || 'flex-start';
+  document.documentElement.style.setProperty('--align', align);
+  bar.style.transformOrigin = align === 'flex-end' ? 'top right' : align === 'center' ? 'top center' : 'top left';
+  if (scale !== 1) { bar.style.transform = `scale(${scale})`; }
+  const $ = (id) => document.getElementById(id);
+  const tints = { CT: 'rgba(74,168,255,.38)', T: 'rgba(255,176,46,.38)' };
+
+  const last = {};
+  function text(id, v, bump) {
+    const s = v == null ? '' : String(v), el = $(id);
+    if (el.textContent === s) return;
+    el.textContent = s;
+    if (bump && last[id] !== undefined) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    last[id] = s;
+  }
+  // длинное название — уменьшаем шрифт, пока не влезет (до 11px)
+  function fit(id) {
+    const el = $(id);
+    let size = 14.5; el.style.fontSize = size + 'px';
+    while (el.scrollWidth > el.clientWidth + 1 && size > 11) { size -= 0.5; el.style.fontSize = size + 'px'; }
+  }
+  function dots(id, total, won) {
+    const key = total + ':' + won, el = $(id);
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    el.innerHTML = '';
+    for (let i = 0; i < total; i++) { const d = document.createElement('span'); d.className = 'dot' + (i < won ? ' won' : ''); el.appendChild(d); }
+  }
+  function logo(id, url, show) {
+    const el = $(id);
+    if (!show || !url) { el.classList.add('off'); el.removeAttribute('src'); el.dataset.u = ''; return; }
+    const src = '/logo?u=' + encodeURIComponent(url);
+    if (el.dataset.u !== src) { el.dataset.u = src; el.classList.add('off'); el.onload = () => el.classList.remove('off'); el.onerror = () => el.classList.add('off'); el.src = src; }
+  }
+
+  function render(s) {
+    const show = s.status && s.status !== 'idle' && (s.team1 || s.mode === 'manual');
+    bar.classList.toggle('hidden', !show);
+    if (!show) return;
+    const d = s.display || {};
+    const showLogos = d.showLogos !== false && q.get('nologo') !== '1';
+    logo('l1', s.logo1, showLogos); logo('l2', s.logo2, showLogos);
+
+    text('n1', s.team1 || 'TBD'); text('n2', s.team2 || 'TBD');
+    const need = Math.max(1, Math.ceil((s.bestOf || 3) / 2));
+    dots('d1', need, Math.min(need, s.maps1 || 0));
+    dots('d2', need, Math.min(need, s.maps2 || 0));
+    fit('n1'); fit('n2');
+
+    const over = s.status === 'over';
+    const live = s.status === 'live';
+    const haveRounds = s.rounds1 != null && s.rounds2 != null;
+    let a, b, top, bot;
+    if (over) { a = s.maps1; b = s.maps2; top = 'ФИНАЛ'; bot = s.bestOf ? 'BO' + s.bestOf : ''; }
+    else if (live) {
+      a = haveRounds ? s.rounds1 : 0; b = haveRounds ? s.rounds2 : 0;
+      top = (d.showMap !== false && s.map) ? s.map : 'LIVE';
+      bot = s.round ? 'Раунд ' + s.round : (s.bestOf ? 'BO' + s.bestOf : '');
+    } else if (s.status === 'loading') { a = '–'; b = '–'; top = '…'; bot = ''; }
+    else { a = '–'; b = '–'; top = 'СКОРО'; bot = s.bestOf ? 'BO' + s.bestOf : ''; }
+    text('s1', a, true); text('s2', b, true);
+    $('ct').innerHTML = '';
+    if (live) { const dot = document.createElement('span'); dot.className = 'live-dot'; $('ct').appendChild(dot); }
+    $('ct').appendChild(document.createTextNode(top));
+    text('cb', bot);
+
+    const s1 = over ? '' : (s.side1 || ''), s2 = over ? '' : (s.side2 || '');
+    $('s1').className = 'score ' + s1; $('s2').className = 'score ' + s2;
+    bar.style.setProperty('--tint1', tints[s1] || 'rgba(255,255,255,.10)');
+    bar.style.setProperty('--tint2', tints[s2] || 'rgba(255,255,255,.10)');
+    const l1 = over && s.maps1 < s.maps2, l2 = over && s.maps2 < s.maps1;
+    $('n1').parentElement.classList.toggle('loser', l1); $('l1').classList.toggle('loser', l1);
+    $('n2').parentElement.classList.toggle('loser', l2); $('l2').classList.toggle('loser', l2);
+
+    const err = $('err');
+    if (q.get('debug') === '1' && s.error) { err.style.display = 'block'; err.textContent = s.error; } else err.style.display = 'none';
+  }
+
+  // какой худ: /w/<id> на сервере, иначе локальный
+  const wm = location.pathname.match(/^\/w\/([a-z0-9]+)/);
+  const HUD = wm ? wm[1] : 'local';
+  const API = '/api/h/' + HUD + '/';
+  const SNAP_KEY = 'hud-snap:' + HUD;
+  let restoring = false;
+  async function tick() {
+    try {
+      const s = await (await fetch(API + 'state', { cache: 'no-store' })).json();
+      if (s.missing) {
+        // сервер перезапустился и забыл худ — отдаём ему последние настройки
+        if (restoring) return; restoring = true;
+        let snap = null; try { snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch {}
+        await fetch(API + 'restore', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ snap: snap || {} }) }).catch(() => {});
+        restoring = false; return;
+      }
+      if (s.snap) { try { localStorage.setItem(SNAP_KEY, JSON.stringify(s.snap)); } catch {} }
+      render(s);
+    } catch {}
+  }
+  tick(); setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>

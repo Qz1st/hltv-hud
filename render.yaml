@@ -1,0 +1,23 @@
+# Деплой на Render.com в один клик (бесплатный тариф).
+# Render сам прочитает этот файл: https://render.com/deploy?repo=<ссылка на этот репозиторий>
+services:
+  - type: web
+    name: hltv-hud
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install --omit=dev
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: CLOUD
+        value: "1"
+      - key: NODE_VERSION
+        value: "22"
+      # секрет для ключей пультов — Render сгенерирует его сам и он не меняется между перезапусками
+      - key: SECRET
+        generateValue: true
+      # на бесплатном тарифе мало памяти — без запасного браузера
+      - key: BROWSER_FALLBACK
+        value: "0"
