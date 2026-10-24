@@ -4,12 +4,14 @@
 
 ## На сервере (по ссылке, ничего не качать)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Qz1st/hltv-hud)
+Бесплатно на Render.com, без карты:
 
-1. Нажмите кнопку выше → войдите через GitHub → **Apply / Deploy**. Через 2–3 минуты будет адрес вида `https://hltv-hud-xxxx.onrender.com`.
-2. Откройте его → **«+ Новый худ»** → откроется пульт этого худа.
-3. В OBS: Источники → «+» → **Браузер** → адрес плашки `https://…/w/<id>`, размер **490×62**.
-4. В пульт вставьте ссылку на матч с HLTV → «Показать».
+1. https://dashboard.render.com → **New → Web Service** → подключить репозиторий `Qz1st/hltv-hud`.
+2. Поля: **Language** `Node`, **Build Command** `npm install --omit=dev`, **Start Command** `node server.js`, **Instance Type** `Free`. Остальное не трогать.
+3. **Deploy Web Service**. Через 2–3 минуты будет адрес вида `https://hltv-hud-xxxx.onrender.com`.
+4. Открыть адрес → **«+ Новый худ»** → пульт. В OBS: Источники → «+» → **Браузер** → адрес плашки `https://…/w/<id>`, размер **490×62**. В пульт — ссылку на матч с HLTV.
+
+(Кнопка Blueprint с `render.yaml` тоже работает, но Render просит для неё карту.)
 
 Каждый худ — своя плашка и свой пульт; сделайте сколько нужно для параллельных матчей. Ссылка на пульт — это пароль худа, не показывайте её на стриме. Пульт можно встроить в OBS: Док-панели → Пользовательские док-панели браузера.
 

@@ -62,6 +62,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------- секрет для ключей пультов ----------
 const SECRET = (() => {
   if (process.env.SECRET) return process.env.SECRET;
+  // Render без SECRET: диск там временный, поэтому берём стабильный ID сервиса,
+  // чтобы ссылки на пульты не менялись после перезапуска
+  if (process.env.RENDER_SERVICE_ID) return crypto.createHash('sha256').update('hltv-hud:' + process.env.RENDER_SERVICE_ID + ':' + (process.env.RENDER_SERVICE_NAME || '')).digest('hex');
   const f = path.join(BASE_DIR, 'secret.txt');
   try { const s = fs.readFileSync(f, 'utf8').trim(); if (s) return s; } catch {}
   const s = crypto.randomBytes(24).toString('hex');
